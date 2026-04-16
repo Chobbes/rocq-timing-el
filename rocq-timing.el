@@ -42,9 +42,9 @@
             (q3 (plist-get QUARTS :q3)))
         (if (and (>= time q1) (< time q2))
             (overlay-put ov 'face rocq-timing-q1-face)
-          (if (and (>= time q2) (< time q3))
+          (if (and (>= time q2) (< time q3) (> q2 q1))
               (overlay-put ov 'face rocq-timing-q2-face)
-          (if (>= time q3)
+          (if (and (>= time q3) (> q3 q2))
               (overlay-put ov 'face rocq-timing-q3-face))))))))
 
 (defun rocq-timing-info-quartiles (INFO)
