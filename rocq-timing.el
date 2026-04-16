@@ -31,7 +31,7 @@
 (defun rocq-timing-info-to-overlay (BUFFER INFO &optional QUARTS)
   "Make an overlay in a given buffer adding a tooltip with timing information."
   (let
-      ((ov (make-overlay (plist-get INFO :start) (plist-get INFO :end) BUFFER))
+      ((ov (make-overlay (byte-to-position (plist-get INFO :start)) (byte-to-position (plist-get INFO :end)) BUFFER))
        (time (plist-get INFO :time)))
     (overlay-put ov 'rocq-timing t)
     (overlay-put ov 'help-echo (format "%s" time))
