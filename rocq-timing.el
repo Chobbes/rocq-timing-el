@@ -14,8 +14,8 @@
 
 (defun rocq-timing-match-to-info ()
   "Extract timing and region information from matched string into a plist."
-  (let ((start (string-to-number (match-string-no-properties 1)))
-        (end (string-to-number (match-string-no-properties 2)))
+  (let ((start (+ 1 (string-to-number (match-string-no-properties 1))))
+        (end (+ 1 (string-to-number (match-string-no-properties 2))))
         (time (string-to-number (match-string-no-properties 3))))
     `(:start ,start :end ,end :time ,time)))
 
