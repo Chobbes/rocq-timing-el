@@ -40,20 +40,21 @@
 
 (defvar rocq-timing-regexp
   "^Chars \\([[:digit:]]+\\) - \\([[:digit:]]+\\).*\\([[:digit:]]+\\.[[:digit:]]*\\) secs (\\([[:digit:]]+\\.[[:digit:]]*\\)u,\\([[:digit:]]+\\.[[:digit:]]*\\)s)"
-  "Regex to parse lines in timing file")
+  "Regex to parse lines in timing file.")
 
 (defvar rocq-timing-highlight-overlays nil
-  "Whether to highlight the regions with timing information, mostly for debug purposes")
-
+  "Whether to highlight the regions with timing information.
+This is mostly
+for debug purposes")
 (defvar rocq-timing-colour-overlays t
-  "Highlight regions based on how much time they take")
+  "Highlight regions based on how much time they take.")
 
 (defvar rocq-timing-q1-face '(:background "green")
-  "Face for commands that take a small amount of time to run relative to others in the file.")
+  "Face for commands that take a short time.")
 (defvar rocq-timing-q2-face '(:background "yellow")
-  "Face for commands that take a medium amount of time to run relative to others in the file.")
+  "Face for commands that take a moderate amount of time.")
 (defvar rocq-timing-q3-face '(:background "red")
-  "Face for commands that take a long amount of time to run relative to others in the file.")
+  "Face for commands that take a long.")
 
 (defun rocq-timing-match-to-info ()
   "Extract timing and region information from matched string into a plist."
@@ -72,7 +73,10 @@
       matches)))
 
 (defun rocq-timing-info-to-overlay (BUFFER INFO &optional QUARTS)
-  "Make an overlay in a given buffer adding a tooltip with timing information."
+  "Make an overlay in a given BUFFER adding a tooltip with timing information.
+The timing information comes from INFO, which is a PLIST that must
+contain :start, :end, and :time properties.  QUARTS provides
+interquartile ranges in :q1, :q2, and :q3 properties."
   (let
       ((ov (make-overlay (byte-to-position (plist-get INFO :start)) (byte-to-position (plist-get INFO :end)) BUFFER))
        (time (plist-get INFO :time)))
@@ -91,19 +95,19 @@
               (overlay-put ov 'face rocq-timing-q3-face))))))))
 
 (defun rocq-timing-info-quartiles (INFO)
-  "Calculate Q1/Q2/Q3 for the timings in a chunk of info."
+  "Calculate Q1/Q2/Q3 for the timings in a chunk of INFO."
   (let* ((sl (sort (mapcar (lambda (i) (plist-get i :time)) INFO)))
          (len (length sl)))
     (when sl
       `(:q1 ,(nth (/ len 4) sl) :q2 ,(nth (/ len 2) sl) :q3 ,(nth (* 3 (/ len 4)) sl)))))
 
 (defun rocq-timing-overlays-clear ()
-  "Clear the overlays in the current buffer related to rocq-timing"
+  "Clear the overlays in the current buffer related to rocq-timing."
   (interactive)
   (remove-overlays (point-min) (point-max) 'rocq-timing t))
 
 (defun rocq-timing-overlays ()
-  "Add tooltip overlays with timing information from a .v.timing file, if it exists."
+  "Add tooltip overlays with timing information from a `.v.timing` file."
   (interactive)
   (let* ((buffer (current-buffer))
          (current-file (buffer-file-name))
