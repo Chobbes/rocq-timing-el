@@ -215,6 +215,17 @@ should be (r g b) components with values between 0.0 and 1.0 inclusive
     (nreverse result)))
 
 
+(load-file "turbo-colormap.el")
+
+(defun rocq-make-turbo-colormap-gradient (step-number)
+  (let* (result)
+    (dotimes (k step-number)
+      (let* ((factor (rocq-make-color-logistic k)))
+	(push (turbo-colormap (+ 0.5 (* 0.5 (/ (float k) (float step-number)))))
+	      result)))
+    ;; (message "result = %s" result)
+    (nreverse result)))
+
 (defun rocq-timing-info-brackets (INFO)
   "Calculate a heat map for timings in a chunk of info. Assumes an exponential distribution of timings."
   (let* ((sl (sort (mapcar (lambda (i) (plist-get i :time)) INFO)))
@@ -222,7 +233,8 @@ should be (r g b) components with values between 0.0 and 1.0 inclusive
 	 (max-time (last sl))
 	 (num-brackets (ceiling (log len rocq-timing-bracket-factor)))
 	 (bg-color (frame-parameter nil 'background-color))
-	 (brackets (rocq-make-logistic-color-gradient (color-name-to-rgb (frame-parameter nil 'background-color)) (color-name-to-rgb "#FF0000") num-brackets)))	 
+	 (brackets (rocq-make-turbo-colormap-gradient num-brackets)))
+	 ;; (brackets (rocq-make-logistic-color-gradient (color-name-to-rgb (frame-parameter nil 'background-color)) (color-name-to-rgb "#FF0000") num-brackets)))	 
 	 ;; (brackets (rocq-make-exponential-color-gradient (color-name-to-rgb (frame-parameter nil 'background-color)) (color-name-to-rgb "#FF0000") num-brackets)))
 	 ;; (brackets (cons (color-name-to-rgb bg-color) (color-gradient (color-name-to-rgb bg-color) (color-name-to-rgb "red") num-brackets))))
     (message "max-time = %s len = %s, num-brackets = %s" max-time len num-brackets)
@@ -237,11 +249,11 @@ should be (r g b) components with values between 0.0 and 1.0 inclusive
 	    brackets)))
     
 
+
 (defun rocq-timing-overlays-clear ()
   "Clear the overlays in the current buffer related to rocq-timing."
   (interactive)
   (remove-overlays (point-min) (point-max) 'rocq-timing t))
-
 
 (defun rocq-timing-overlays ()
   "Add tooltip overlays with timing information from a `.v.timing` file."
