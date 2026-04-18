@@ -1,16 +1,60 @@
+;;; rocq-timing.el --- Display timing of rocq commands in buffer  -*- lexical-binding: t; -*-
+
+;; Copyright (C) 2026 Calvin Beck
+
+;; Author:  Calvin Beck <hobbes@ualberta.ca>
+;; URL: https://github.com/Chobbes/rocq-timing-el
+;; Created: 2026
+;; Version: 0.0.1
+;; Keywords: convenience, tools, rocq, coq, proofs, profiling
+;; Package-Requires: ((emacs "24"))
+
+;; Copyright 2026 Calvin Beck
+
+;; Permission is hereby granted, free of charge, to any person
+;; obtaining a copy of this software and associated documentation
+;; files (the "Software"), to deal in the Software without
+;; restriction, including without limitation the rights to use, copy,
+;; modify, merge, publish, distribute, sublicense, and/or sell copies
+;; of the Software, and to permit persons to whom the Software is
+;; furnished to do so, subject to the following conditions:
+
+;; The above copyright notice and this permission notice shall be
+;; included in all copies or substantial portions of the Software.
+
+;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+;; EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+;; MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+;; NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+;; BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+;; ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+;; CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+;; SOFTWARE.
+
+;;; Commentary:
+
+;; rocq-timing-el is used to overlay timing information from
+;; `.v.timing` files in the current buffer
+
+;;; Code:
+
 (defvar rocq-timing-regexp
   "^Chars \\([[:digit:]]+\\) - \\([[:digit:]]+\\).*\\([[:digit:]]+\\.[[:digit:]]*\\) secs (\\([[:digit:]]+\\.[[:digit:]]*\\)u,\\([[:digit:]]+\\.[[:digit:]]*\\)s)"
-  "Regex to parse lines in timing file")
+  "Regex to parse lines in timing file.")
 
 (defvar rocq-timing-highlight-overlays nil
-  "Whether to highlight the regions with timing information, mostly for debug purposes")
-
+  "Whether to highlight the regions with timing information.
+This is mostly
+for debug purposes")
 (defvar rocq-timing-colour-overlays t
-  "Highlight regions based on how much time they take")
+  "Highlight regions based on how much time they take.")
 
-(defvar rocq-timing-q1-face '(:background "green"))
-(defvar rocq-timing-q2-face '(:background "yellow"))
-(defvar rocq-timing-q3-face '(:background "red"))
+(defvar rocq-timing-q1-face '(:background "green")
+  "Face for commands that take a short time.")
+(defvar rocq-timing-q2-face '(:background "yellow")
+  "Face for commands that take a moderate amount of time.")
+(defvar rocq-timing-q3-face '(:background "red")
+  "Face for commands that take a long.")
 
 (defun rocq-timing-match-to-info ()
   "Extract timing and region information from matched string into a plist."
@@ -43,7 +87,10 @@ prev-face if the time is too small and time-N if the time is too big"
 
 
 (defun rocq-timing-info-to-overlay (BUFFER INFO &optional BRACKETS)
-  "Make an overlay in a given buffer adding a tooltip with timing information."
+  "Make an overlay in a given buffer adding a tooltip with timing information.
+The timing information comes from INFO, which is a PLIST that must
+contain :start, :end, and :time properties.  BRACKETS provides a map
+from time ranges to face properties."
   (let
       ((ov (make-overlay (byte-to-position (plist-get INFO :start)) (byte-to-position (plist-get INFO :end)) BUFFER))
        (time (plist-get INFO :time)))
@@ -65,13 +112,14 @@ prev-face if the time is too small and time-N if the time is too big"
 ;;               (overlay-put ov 'face rocq-timing-q3-face))))))))
 
 (defun rocq-timing-info-quartiles (INFO)
-  "Calculate Q1/Q2/Q3 for the timings in a chunk of info."
+  "Calculate Q1/Q2/Q3 for the timings in a chunk of INFO."
   (let* ((sl (sort (mapcar (lambda (i) (plist-get i :time)) INFO)))
          (len (length sl)))
     (when sl
       ;; (message "len sl: %s" len)
       ;; (message "sl:\n%s" sl)
       `(:q1 ,(nth (/ len 4) sl) :q2 ,(nth (/ len 2) sl) :q3 ,(nth (* 3 (/ len 4)) sl)))))
+
 
 (defcustom rocq-timing-bracket-factor 2
   "A number >= 2.  When n, color brackets will be [0,(n-1)/n] [0,
@@ -188,21 +236,25 @@ should be (r g b) components with values between 0.0 and 1.0 inclusive
 		(list time (list :background (rocq-make-color-from-rgb color)))))
 	    brackets)))
     
+
+(defun rocq-timing-overlays-clear ()
+  "Clear the overlays in the current buffer related to rocq-timing."
+  (interactive)
+  (remove-overlays (point-min) (point-max) 'rocq-timing t))
+
+
 (defun rocq-timing-overlays ()
-  "Add tooltip overlays with timing information from a .v.timing file, if it exists."
+  "Add tooltip overlays with timing information from a `.v.timing` file."
   (interactive)
   (let* ((buffer (current-buffer))
          (current-file (buffer-file-name))
          (file (concat current-file ".timing"))
          (info (rocq-timing-parse-file file))
-         (brackets (rocq-timing-info-brackets info)))
+	 (brackets (rocq-timing-info-brackets info)))
+    (rocq-timing-overlays-clear)    
     (message "%s" brackets)
     (remove-overlays (point-min) (point-max) 'rocq-timing t)
     (mapcar (lambda (i) (rocq-timing-info-to-overlay buffer i brackets)) info)))
 
-(defun rocq-timing-overlays-clear ()
-  "Clear the overlays in the current buffer related to rocq-timing"
-  (interactive)
-  (remove-overlays (point-min) (point-max) 'rocq-timing t))
-
 (provide 'rocq-timing)
+;;; rocq-timing.el ends here
