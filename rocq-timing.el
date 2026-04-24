@@ -43,18 +43,21 @@
   "Regex to parse lines in timing file.")
 
 (defvar rocq-timing-highlight-overlays nil
-  "Whether to highlight the regions with timing information.
-This is mostly
+  "Whether to highlight the regions with timing information. This is mostly
 for debug purposes")
+
 (defvar rocq-timing-colour-overlays t
   "Highlight regions based on how much time they take.")
 
-(defvar rocq-timing-q1-face '(:background "green")
-  "Face for commands that take a short time.")
-(defvar rocq-timing-q2-face '(:background "yellow")
-  "Face for commands that take a moderate amount of time.")
-(defvar rocq-timing-q3-face '(:background "red")
-  "Face for commands that take a long.")
+(defvar rocq-timing-color-scheme "logistic"
+  "color scheme - use rocq-timing-set-color-scheme to update"
+  )
+
+(defcustom rocq-timing-bracket-factor 2
+  "A number >= 2.  When n, color brackets will be [0,(n-1)/n] [0,
+n^2-1/n^2] ... and there are log_n #times brackets.  Larger values mean
+coarser-grained but sharper boundaries.")
+
 
 (defun rocq-timing-match-to-info ()
   "Extract timing and region information from matched string into a plist."
@@ -75,7 +78,7 @@ for debug purposes")
 (defun rocq-timing-lookup-face (BRACKETS time &optional prev-face)
   "Given a list of timing brakckets ((time-0 face-0) ... (time-N face-N))
 in time-sorted order, returns face-i where time-0 <= time < time-N, 
-prev-face if the time is too small and time-N if the time is too big"
+prev-face if the time is too small and face-N if the time is too big"
   (if (null BRACKETS)
       prev-face
     (let* ((curr-time (caar BRACKETS))
@@ -101,16 +104,6 @@ from time ranges to face properties."
       (let ((timing-face (rocq-timing-lookup-face BRACKETS time nil)))
 	(if timing-face (overlay-put ov 'face timing-face))))))
 
-;; (let ((q1 (plist-get QUARTS :q1))
-;;             (q2 (plist-get QUARTS :q2))
-;;             (q3 (plist-get QUARTS :q3)))
-;;         (if (and (>= time q1) (< time q2))
-;;             (overlay-put ov 'face rocq-timing-q1-face)
-;;           (if (and (>= time q2) (< time q3) (> q2 q1))
-;;               (overlay-put ov 'face rocq-timing-q2-face)
-;;           (if (and (>= time q3) (> q3 q2))
-;;               (overlay-put ov 'face rocq-timing-q3-face))))))))
-
 (defun rocq-timing-info-quartiles (INFO)
   "Calculate Q1/Q2/Q3 for the timings in a chunk of INFO."
   (let* ((sl (sort (mapcar (lambda (i) (plist-get i :time)) INFO)))
@@ -121,17 +114,10 @@ from time ranges to face properties."
       `(:q1 ,(nth (/ len 4) sl) :q2 ,(nth (/ len 2) sl) :q3 ,(nth (* 3 (/ len 4)) sl)))))
 
 
-(defcustom rocq-timing-bracket-factor 2
-  "A number >= 2.  When n, color brackets will be [0,(n-1)/n] [0,
-n^2-1/n^2] ... and there are log_n #times brackets.  Larger values mean
-coarser-grained but sharper boundaries.")
-
-
 (defun rocq-timing-info-get-nth-bracket-face (n num-brackets)
   "Calculate a face for the nth bracket out of num-brackets"
   (let ((face-color "green"))
-    '(:background face-color))
-  )
+    '(:background face-color)))
 
 
 (defun rocq-timing-get-time-index (k len)
@@ -139,13 +125,12 @@ coarser-grained but sharper boundaries.")
 	 (m (float k))
 	 (r (/ n m))
 	 (i (floor (* r (float len)))))
-    i
-    ))
+    i))
 
-(defun rocq-make-color-from-rgb (rgb)
+(defun rocq-timing-make-color-from-rgb (rgb)
     (color-rgb-to-hex (car rgb) (cadr rgb) (caddr rgb) 2))
 
-(defun rocq-make-color-ratio (k)
+(defun rocq-timing-make-color-ratio (k)
   "returns (N^k - 1)/(N^k) as floating point where N is
    the rocq-timing-bracket-factor"
   (let* ((m (expt (float rocq-timing-bracket-factor)  (float k)))
@@ -153,12 +138,12 @@ coarser-grained but sharper boundaries.")
 	 (r (/ n m)))
     r))
 
-(defun rocq-make-color-logistic (k)
+(defun rocq-timing-make-color-logistic (k)
   "returns (1 / (1 + (1/k - 1)^2)"
   (/ 1.0 (+ 1.0 (expt (- (/ 1.0 k) 1.0) 2.0))))
 
-(defun rocq-make-logistic-color-gradient (start stop step-number)
-  "Return a list with STEP-NUMBER colors from START to STOP.
+(defun rocq-timing-make-logistic-color-gradient (start stop num-brackets)
+  "Return a list with NUM-BRACKETS colors from START to STOP.
 The color list builds a color gradient starting at color START to color
 STOP. Unlike color-gradient, it includes START in the list and scales
 skews the distribution exponentially in the index.  START and STOP
@@ -176,8 +161,8 @@ should be (r g b) components with values between 0.0 and 1.0 inclusive
 	 result)
     ;; (message "start = %s" start)
     ;; (message "stop = %s" stop)
-    (dotimes (k step-number)
-      (let* ((factor (rocq-make-color-logistic (/ (float k) (float step-number)))))
+    (dotimes (k num-brackets)
+      (let* ((factor (rocq-timing-make-color-logistic (/ (float k) (float num-brackets)))))
 	(push (list (+ r-start (* factor r-gap))
 		    (+ g-start (* factor g-gap))
 		    (+ b-start (* factor b-gap)))
@@ -186,8 +171,8 @@ should be (r g b) components with values between 0.0 and 1.0 inclusive
     (nreverse result)))
 
 
-(defun rocq-make-exponential-color-gradient (start stop step-number)
-  "Return a list with STEP-NUMBER colors from START to STOP.
+(defun rocq-timing-make-exponential-color-gradient (start stop num-brackets)
+  "Return a list with NUM-BRACKETS colors from START to STOP.
 The color list builds a color gradient starting at color START to color
 STOP. Unlike color-gradient, it includes START in the list and scales
 skews the distribution exponentially in the index.  START and STOP
@@ -205,8 +190,8 @@ should be (r g b) components with values between 0.0 and 1.0 inclusive
 	 result)
     ;; (message "start = %s" start)
     ;; (message "stop = %s" stop)
-    (dotimes (k step-number)
-      (let* ((factor (rocq-make-color-ratio k)))
+    (dotimes (k num-brackets)
+      (let* ((factor (rocq-timing-make-color-ratio k)))
 	(push (list (+ r-start (* factor r-gap))
 		    (+ g-start (* factor g-gap))
 		    (+ b-start (* factor b-gap)))
@@ -214,17 +199,47 @@ should be (r g b) components with values between 0.0 and 1.0 inclusive
     ;; (message "result = %s" result)
     (nreverse result)))
 
+(defun rocq-timing-make-linear-color-gradient (start stop num-brackets)
+  (let* ((bg-color (frame-parameter nil 'background-color)))
+    (cons start (color-gradient start stop num-brackets))))
 
 (load-file "turbo-colormap.el")
 
-(defun rocq-make-turbo-colormap-gradient (step-number)
+(defun rocq-timing-make-turbo-colormap-gradient (start stop num-brackets)
   (let* (result)
-    (dotimes (k step-number)
-      (let* ((factor (rocq-make-color-logistic k)))
-	(push (turbo-colormap (+ 0.5 (* 0.5 (/ (float k) (float step-number)))))
+    (dotimes (k num-brackets)
+      (let* ((factor (rocq-timing-make-color-logistic k)))
+	(push (turbo-colormap (+ 0.5 (* 0.5 (/ (float k) (float num-brackets)))))
 	      result)))
     ;; (message "result = %s" result)
     (nreverse result)))
+
+
+(defun rocq-timing-set-color-scheme ()
+  "Lets the user choose a color scheme."
+  (interactive)
+  (let* ((choices '(("logistic" . "[default] weight toward long tail")
+		    ("exponential" . "even more weight in the tail")
+                    ("linear" . "uniform gradient")
+		    ("turbo" . "green to red - better for dark backgrounds")))
+	 (candidates (mapcar (lambda (cell)
+			       (cons (format "%s (%s)" (car cell) (cdr cell)) (car cell)))
+			     choices)))
+    (setq rocq-timing-color-scheme (cdr (assoc (completing-read "Color Scheme: " candidates) candidates)))
+    (rocq-timing-overlays)))
+
+
+
+(defun rocq-timing-get-color-scheme (num-brackets)
+  "return the color information for the currently-chose color scheme"
+  (let* ((start (color-name-to-rgb (frame-parameter nil 'background-color)))
+	 (stop  (color-name-to-rgb "#FF0000")))
+    (pcase rocq-timing-color-scheme
+      ("linear" (rocq-timing-make-linear-color-gradient start stop num-brackets))
+      ("logistic" (rocq-timing-make-logistic-color-gradient start stop num-brackets))
+      ("exponetial" (rocq-timing-make-exponential-color-gradient start stop num-brackets))
+      ("turbo" (rocq-timing-make-turbo-colormap-gradient start stop num-brackets)))))
+
 
 (defun rocq-timing-info-brackets (INFO)
   "Calculate a heat map for timings in a chunk of info. Assumes an exponential distribution of timings."
@@ -232,12 +247,8 @@ should be (r g b) components with values between 0.0 and 1.0 inclusive
          (len (length sl))
 	 (max-time (last sl))
 	 (num-brackets (ceiling (log len rocq-timing-bracket-factor)))
-	 (bg-color (frame-parameter nil 'background-color))
-	 (brackets (rocq-make-turbo-colormap-gradient num-brackets)))
-	 ;; (brackets (rocq-make-logistic-color-gradient (color-name-to-rgb (frame-parameter nil 'background-color)) (color-name-to-rgb "#FF0000") num-brackets)))	 
-	 ;; (brackets (rocq-make-exponential-color-gradient (color-name-to-rgb (frame-parameter nil 'background-color)) (color-name-to-rgb "#FF0000") num-brackets)))
-	 ;; (brackets (cons (color-name-to-rgb bg-color) (color-gradient (color-name-to-rgb bg-color) (color-name-to-rgb "red") num-brackets))))
-    (message "max-time = %s len = %s, num-brackets = %s" max-time len num-brackets)
+	 (brackets (rocq-timing-get-color-scheme num-brackets)))
+    ;; (message "max-time = %s len = %s, num-brackets = %s" max-time len num-brackets)
     (setq k 1)
     (mapcar (lambda (color)
 	      (set 'k (* k rocq-timing-bracket-factor))
@@ -245,11 +256,9 @@ should be (r g b) components with values between 0.0 and 1.0 inclusive
 	      (let* ((index (rocq-timing-get-time-index k len))
 		     (time (nth index sl)))
 		;; (message "i = %s time = %s" index time)
-		(list time (list :background (rocq-make-color-from-rgb color)))))
+		(list time (list :background (rocq-timing-make-color-from-rgb color)))))
 	    brackets)))
     
-
-
 (defun rocq-timing-overlays-clear ()
   "Clear the overlays in the current buffer related to rocq-timing."
   (interactive)
@@ -264,7 +273,7 @@ should be (r g b) components with values between 0.0 and 1.0 inclusive
          (info (rocq-timing-parse-file file))
 	 (brackets (rocq-timing-info-brackets info)))
     (rocq-timing-overlays-clear)    
-    (message "%s" brackets)
+    ;; (message "%s" brackets)
     (remove-overlays (point-min) (point-max) 'rocq-timing t)
     (mapcar (lambda (i) (rocq-timing-info-to-overlay buffer i brackets)) info)))
 
